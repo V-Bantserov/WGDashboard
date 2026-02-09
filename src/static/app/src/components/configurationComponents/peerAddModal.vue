@@ -53,7 +53,7 @@ const peerData = ref({
 		? parseInt(override.MTU)
 		: parseInt(globalDefaults.peer_mtu),
 	preshared_key: "",
-	preshared_key_bulkAdd: false,
+	preshared_key_bulkAdd: Boolean(dashboardStore.Configuration.Peers.peer_preshared_key_default),
 	advanced_security: "off",
 	allowed_ips_validation: true,
 })
@@ -160,7 +160,8 @@ watch(() => {
 											</div>
 											<div class="row gy-3">
 												<div class="col-sm" v-if="!peerData.bulkAdd">
-													<PresharedKeyInput :saving="saving" :data="peerData" :bulk="peerData.bulkAdd"></PresharedKeyInput>
+													<PresharedKeyInput :saving="saving" :data="peerData" :bulk="peerData.bulkAdd"
+														:defaultEnabled="Boolean(dashboardStore.Configuration.Peers.peer_preshared_key_default)"></PresharedKeyInput>
 												</div>
 
 												<div class="col-sm">
