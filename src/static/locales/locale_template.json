@@ -463,5 +463,21 @@
 	"Start": "",
 	"Stop": "",
 	"Running": "",
-	"Stopped": ""
+	"Stopped": "",
+	"Admin Users": "",
+	"Add Admin": "",
+	"Change My Password": "",
+	"Created": "",
+	"Last Login": "",
+	"TOTP": "",
+	"Actions": "",
+	"You": "",
+	"Add New Admin": "",
+	"Edit Admin": "",
+	"Change Password": "",
+	"Reset Password": "",
+	"Delete Admin": "",
+	"Confirm Password": "",
+	"Confirm New Password": "",
+	"Save Changes": ""
 }

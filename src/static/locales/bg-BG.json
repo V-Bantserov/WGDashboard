@@ -463,5 +463,21 @@
 	"Start": "Старт",
 	"Stop": "Стоп",
 	"Running": "Работи",
-	"Stopped": "Спрян"
+	"Stopped": "Спрян",
+	"Admin Users": "Администратори",
+	"Add Admin": "Добави администратор",
+	"Change My Password": "Смени паролата ми",
+	"Created": "Създаден",
+	"Last Login": "Последен вход",
+	"TOTP": "TOTP",
+	"Actions": "Действия",
+	"You": "Вие",
+	"Add New Admin": "Добави нов администратор",
+	"Edit Admin": "Редактирай администратор",
+	"Change Password": "Смени парола",
+	"Reset Password": "Нулирай парола",
+	"Delete Admin": "Изтрий администратор",
+	"Confirm Password": "Потвърди парола",
+	"Confirm New Password": "Потвърди новата парола",
+	"Save Changes": "Запази промените"
 }
