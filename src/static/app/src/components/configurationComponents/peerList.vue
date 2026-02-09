@@ -1,6 +1,6 @@
 <script setup async>
 import {computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch} from "vue";
-import {useRoute} from "vue-router";
+import {useRoute, useRouter} from "vue-router";
 import {fetchGet} from "@/utilities/fetch.js";
 import ProtocolBadge from "@/components/protocolBadge.vue";
 import LocaleText from "@/components/text/localeText.vue";
@@ -26,6 +26,7 @@ const PeerAddModal = defineAsyncComponent(() => import("@/components/configurati
 const dashboardStore = DashboardConfigurationStore()
 const wireguardConfigurationStore = WireguardConfigurationsStore()
 const route = useRoute()
+const router = useRouter()
 const configurationInfo = ref({})
 const configurationPeers = ref([])
 const configurationToggling = ref(false)
@@ -233,18 +234,30 @@ const searchPeers = computed(() => {
 		}).slice(0, showPeersCount.value)
 	}
 
-
 	return re
 })
 
+const closePeerDetails = () => {
+        configurationModals.value.peerDetails.modalOpen = false
+        if (route.query.from === 'health') {
+                router.push('/settings/health_monitor')
+        }
+}
+
 watch(() => route.query.id, (newValue) => {
-	if (newValue){
-		wireguardConfigurationStore.searchString = newValue
-	}else{
-		wireguardConfigurationStore.searchString = undefined
-	}
+        if (newValue){
+                wireguardConfigurationStore.searchString = newValue
+                // Auto-open peer details modal
+                const peer = configurationPeers.value.find(p => p.id === newValue)
+                if (peer) {
+                        configurationModalSelectedPeer.value = peer
+                        configurationModals.value.peerDetails.modalOpen = true
+                }
+        }else{
+                wireguardConfigurationStore.searchString = undefined
+        }
 }, {
-	immediate: true
+        immediate: true
 })
 </script>
 
@@ -487,7 +500,7 @@ watch(() => route.query.id, (newValue) => {
 			key="PeerDetailsModal"
 			v-if="configurationModals.peerDetails.modalOpen"
 			:selectedPeer="searchPeers.find(x => x.id === configurationModalSelectedPeer.id)"
-			@close="configurationModals.peerDetails.modalOpen = false"
+			@close="closePeerDetails()"
 		>
 		</PeerDetailsModal>
 	</TransitionGroup>

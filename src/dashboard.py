@@ -183,7 +183,7 @@ def startThreads():
     scheduleJobThread.start()
 
     # Health Monitor - start if enabled
-    if DashboardConfig.GetConfig("Health", "enabled")[1] == "true":
+    if DashboardConfig.GetConfig("Health", "enabled")[1] == True or DashboardConfig.GetConfig("Health", "enabled")[1] == "true":
         PeerHealthMonitorInstance.start()
 
 dictConfig({
@@ -1382,7 +1382,7 @@ def API_getPeerScheduleJobLogs(configName):
         return ResponseObject(False, "Configuration does not exist")
     data = request.args.get("requestAll")
     requestAll = False
-    if data is not None and data == "true":
+    if data is not None and data == True or DashboardConfig.GetConfig("Health", "enabled")[1] == "true":
         requestAll = True
     return ResponseObject(data=AllPeerJobs.getPeerJobLogs(configName))
 

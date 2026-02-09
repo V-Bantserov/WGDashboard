@@ -195,8 +195,10 @@
                   <code class="small">{{ peer.interface }}</code>
                 </td>
                 <td>
-                  <span v-if="peer.name" class="text-info">{{ peer.name }}</span>
-                  <span v-else class="text-muted small">{{ pk.substring(0, 8) }}...</span>
+                  <router-link :to="`/configuration/${peer.interface}/peers?id=${pk}&from=health`" class="text-decoration-none">
+                    <span v-if="peer.name" class="text-info">{{ peer.name }}</span>
+                    <span v-else class="text-muted small">{{ pk.substring(0, 8) }}...</span>
+                  </router-link>
                 </td>
                 <td>
                   <code>{{ peer.vpn_ip }}</code>
