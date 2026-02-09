@@ -142,6 +142,11 @@ export default {
 							<LocaleText t="Traceroute"></LocaleText>
 						</RouterLink>
 					</li>
+					<li class="nav-item">
+						<RouterLink to="/settings/health_monitor" class="nav-link rounded-3" active-class="active">
+							<LocaleText t="Peer Health Monitor"></LocaleText>
+						</RouterLink>
+					</li>
 				</ul>
 				<hr class="text-body my-2">
 				<ul class="nav flex-column px-2 mb-3">
