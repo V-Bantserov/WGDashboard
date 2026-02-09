@@ -54,6 +54,10 @@ export default {
 				{
 					id: "health_monitor",
 					title: "Peer Health Monitor"
+				},
+				{
+					id: "admin_users",
+					title: "Admin Users"
 				}
 			]
 		}
