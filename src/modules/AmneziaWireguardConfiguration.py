@@ -211,8 +211,8 @@ class AmneziaWireguardConfiguration(WireguardConfiguration):
                 if "notes" in cols:
                     continue
                 ddl = sqlalchemy.schema.DDL(
-                    "ALTER TABLE %(table)s ADD COLUMN notes TEXT",
-                    context={"table": table}
+                    "ALTER TABLE \"%(table_name)s\" ADD COLUMN notes TEXT",
+                    context={"table_name": table.name}
                 )
                 conn.execute(ddl)
 

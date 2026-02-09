@@ -73,6 +73,14 @@ const router = createRouter({
                             meta: {
                                 title: "Peer Health Monitor"
                             }
+                        },
+                        {
+                            name: "Admin Users",
+                            path: "admin_users",
+                            component: () => import("@/components/settingsComponent/dashboardAdminUsers.vue"),
+                            meta: {
+                                title: "Admin Users"
+                            }
                         }
                     ],
 					meta: {
