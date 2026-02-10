@@ -47,7 +47,10 @@ class DashboardConfig:
                 "dashboard_sort": "status",
                 "dashboard_theme": "dark",
                 "dashboard_api_key": "false",
-                "dashboard_language": "en-US"
+                "dashboard_language": "en-US",
+                "menu_clients": "true",
+                "menu_webhooks": "true",
+                "menu_help": "true"
             },
             "Peers": {
                 "peer_global_DNS": "1.1.1.1",
