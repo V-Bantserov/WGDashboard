@@ -1,6 +1,5 @@
-<script setup lang="ts">
+<script setup>
 import {DashboardConfigurationStore} from "@/stores/DashboardConfigurationStore.js";
-
 import LocaleText from "@/components/text/localeText.vue";
 import DashboardLanguage from "@/components/settingsComponent/dashboardLanguage.vue";
 import AccountSettingsInputPassword from "@/components/settingsComponent/accountSettingsInputPassword.vue";
@@ -12,51 +11,104 @@ import AccountSettingsInputUsername from "@/components/settingsComponent/account
 import DashboardEmailSettings from "@/components/settingsComponent/dashboardEmailSettings.vue";
 import DashboardWebHooks from "@/components/settingsComponent/dashboardWebHooks.vue";
 import DashboardAdminUsers from "@/components/settingsComponent/dashboardAdminUsers.vue";
+import {fetchPost} from "@/utilities/fetch.js";
 
 const dashboardConfigurationStore = DashboardConfigurationStore()
 
+const updateMenuSetting = async (key, event) => {
+        const value = event.target.checked ? 'true' : 'false';
+        await fetchPost("/api/updateDashboardConfigurationItem", {
+                section: "Server",
+                key: key,
+                value: value
+        }, (res) => {
+                if (res.status){
+                        dashboardConfigurationStore.Configuration.Server[key] = value;
+                }
+        });
+}
 </script>
-
 <template>
-	<div class="d-flex gap-3 flex-column">
-		<div class="card rounded-3">
-			<div class="card-header">
-				<h6 class="my-2">
-					<i class="bi bi-magic me-2"></i>
-					<LocaleText t="Appearance"></LocaleText>
-				</h6>
-			</div>
-			<div class="card-body">
-				<div class="row g-2">
-					<div class="col-sm">
-						<DashboardTheme></DashboardTheme>
-					</div>
-					<div class="col-sm">
-						<DashboardLanguage></DashboardLanguage>
-					</div>
-				</div>
-			</div>
-		</div>
-		<div class="card rounded-3">
-			<div class="card-header">
-				<h6 class="my-2">
-					<i class="bi bi-ethernet me-2"></i>
-					<LocaleText t="Dashboard IP Address & Listen Port"></LocaleText>
-				</h6>
-			</div>
-			<div class="card-body">
-				<DashboardIPPortInput></DashboardIPPortInput>
-			</div>
-		</div>
-		
-		<!-- Admin Users Management (Multiple Admins) -->
-		<DashboardAdminUsers></DashboardAdminUsers>
-
-		<DashboardAPIKeys></DashboardAPIKeys>
-		<DashboardEmailSettings></DashboardEmailSettings>
-	</div>
+        <div class="d-flex gap-3 flex-column">
+                <div class="card rounded-3">
+                        <div class="card-header">
+                                <h6 class="my-2">
+                                        <i class="bi bi-magic me-2"></i>
+                                        <LocaleText t="Appearance"></LocaleText>
+                                </h6>
+                        </div>
+                        <div class="card-body">
+                                <div class="row g-2">
+                                        <div class="col-sm">
+                                                <DashboardTheme></DashboardTheme>
+                                        </div>
+                                        <div class="col-sm">
+                                                <DashboardLanguage></DashboardLanguage>
+                                        </div>
+                                </div>
+                        </div>
+                </div>
+                <div class="card rounded-3">
+                        <div class="card-header">
+                                <h6 class="my-2">
+                                        <i class="bi bi-list me-2"></i>
+                                        <LocaleText t="Menu Visibility"></LocaleText>
+                                </h6>
+                        </div>
+                        <div class="card-body">
+                                <div class="row g-3">
+                                        <div class="col-sm-4">
+                                                <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" role="switch" 
+                                                                id="menuClients"
+                                                                :checked="dashboardConfigurationStore.Configuration.Server.menu_clients === 'true'"
+                                                                @change="updateMenuSetting('menu_clients', $event)">
+                                                        <label class="form-check-label" for="menuClients">
+                                                                <LocaleText t="Show Clients"></LocaleText>
+                                                        </label>
+                                                </div>
+                                        </div>
+                                        <div class="col-sm-4">
+                                                <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" role="switch" 
+                                                                id="menuWebhooks"
+                                                                :checked="dashboardConfigurationStore.Configuration.Server.menu_webhooks === 'true'"
+                                                                @change="updateMenuSetting('menu_webhooks', $event)">
+                                                        <label class="form-check-label" for="menuWebhooks">
+                                                                <LocaleText t="Show Webhooks"></LocaleText>
+                                                        </label>
+                                                </div>
+                                        </div>
+                                        <div class="col-sm-4">
+                                                <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" role="switch" 
+                                                                id="menuHelp"
+                                                                :checked="dashboardConfigurationStore.Configuration.Server.menu_help === 'true'"
+                                                                @change="updateMenuSetting('menu_help', $event)">
+                                                        <label class="form-check-label" for="menuHelp">
+                                                                <LocaleText t="Show Help"></LocaleText>
+                                                        </label>
+                                                </div>
+                                        </div>
+                                </div>
+                        </div>
+                </div>
+                <div class="card rounded-3">
+                        <div class="card-header">
+                                <h6 class="my-2">
+                                        <i class="bi bi-ethernet me-2"></i>
+                                        <LocaleText t="Dashboard IP Address & Listen Port"></LocaleText>
+                                </h6>
+                        </div>
+                        <div class="card-body">
+                                <DashboardIPPortInput></DashboardIPPortInput>
+                        </div>
+                </div>
+                <!-- Admin Users Management (Multiple Admins) -->
+                <DashboardAdminUsers></DashboardAdminUsers>
+                <DashboardAPIKeys></DashboardAPIKeys>
+                <DashboardEmailSettings></DashboardEmailSettings>
+        </div>
 </template>
-
 <style scoped>
-
 </style>
