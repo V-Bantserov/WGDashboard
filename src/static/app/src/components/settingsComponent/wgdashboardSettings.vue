@@ -61,7 +61,7 @@ const updateMenuSetting = async (key, event) => {
                                                 <div class="form-check form-switch">
                                                         <input class="form-check-input" type="checkbox" role="switch" 
                                                                 id="menuClients"
-                                                                :checked="dashboardConfigurationStore.Configuration.Server.menu_clients === 'true'"
+                                                                :checked="String(dashboardConfigurationStore.Configuration.Server.menu_clients) === 'true'"
                                                                 @change="updateMenuSetting('menu_clients', $event)">
                                                         <label class="form-check-label" for="menuClients">
                                                                 <LocaleText t="Show Clients"></LocaleText>
@@ -72,7 +72,7 @@ const updateMenuSetting = async (key, event) => {
                                                 <div class="form-check form-switch">
                                                         <input class="form-check-input" type="checkbox" role="switch" 
                                                                 id="menuWebhooks"
-                                                                :checked="dashboardConfigurationStore.Configuration.Server.menu_webhooks === 'true'"
+                                                                :checked="String(dashboardConfigurationStore.Configuration.Server.menu_webhooks) === 'true'"
                                                                 @change="updateMenuSetting('menu_webhooks', $event)">
                                                         <label class="form-check-label" for="menuWebhooks">
                                                                 <LocaleText t="Show Webhooks"></LocaleText>
@@ -83,10 +83,54 @@ const updateMenuSetting = async (key, event) => {
                                                 <div class="form-check form-switch">
                                                         <input class="form-check-input" type="checkbox" role="switch" 
                                                                 id="menuHelp"
-                                                                :checked="dashboardConfigurationStore.Configuration.Server.menu_help === 'true'"
+                                                                :checked="String(dashboardConfigurationStore.Configuration.Server.menu_help) === 'true'"
                                                                 @change="updateMenuSetting('menu_help', $event)">
                                                         <label class="form-check-label" for="menuHelp">
                                                                 <LocaleText t="Show Help"></LocaleText>
+                                                        </label>
+                                                </div>
+                                        </div>
+                                        <div class="col-sm-4">
+                                                <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" role="switch"
+                                                                id="menuSystemStatus"
+                                                                :checked="String(dashboardConfigurationStore.Configuration.Server.menu_system_status) === 'true'"
+                                                                @change="updateMenuSetting('menu_system_status', $event)">
+                                                        <label class="form-check-label" for="menuSystemStatus">
+                                                                <LocaleText t="Show System Status"></LocaleText>
+                                                        </label>
+                                                </div>
+                                        </div>
+                                        <div class="col-sm-4">
+                                                <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" role="switch"
+                                                                id="menuPing"
+                                                                :checked="String(dashboardConfigurationStore.Configuration.Server.menu_ping) === 'true'"
+                                                                @change="updateMenuSetting('menu_ping', $event)">
+                                                        <label class="form-check-label" for="menuPing">
+                                                                <LocaleText t="Show Ping"></LocaleText>
+                                                        </label>
+                                                </div>
+                                        </div>
+                                        <div class="col-sm-4">
+                                                <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" role="switch"
+                                                                id="menuTraceroute"
+                                                                :checked="String(dashboardConfigurationStore.Configuration.Server.menu_traceroute) === 'true'"
+                                                                @change="updateMenuSetting('menu_traceroute', $event)">
+                                                        <label class="form-check-label" for="menuTraceroute">
+                                                                <LocaleText t="Show Traceroute"></LocaleText>
+                                                        </label>
+                                                </div>
+                                        </div>
+                                        <div class="col-sm-4">
+                                                <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" role="switch"
+                                                                id="menuHealthMonitor"
+                                                                :checked="String(dashboardConfigurationStore.Configuration.Server.menu_health_monitor) === 'true'"
+                                                                @change="updateMenuSetting('menu_health_monitor', $event)">
+                                                        <label class="form-check-label" for="menuHealthMonitor">
+                                                                <LocaleText t="Show Health Monitor"></LocaleText>
                                                         </label>
                                                 </div>
                                         </div>
@@ -104,8 +148,6 @@ const updateMenuSetting = async (key, event) => {
                                 <DashboardIPPortInput></DashboardIPPortInput>
                         </div>
                 </div>
-                <!-- Admin Users Management (Multiple Admins) -->
-                <DashboardAdminUsers></DashboardAdminUsers>
                 <DashboardAPIKeys></DashboardAPIKeys>
                 <DashboardEmailSettings></DashboardEmailSettings>
         </div>

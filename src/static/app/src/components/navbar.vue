@@ -88,21 +88,21 @@ export default {
 							<LocaleText t="Settings"></LocaleText>	
 						</RouterLink>
 					</li>
-					<li class="nav-item" v-if="dashboardConfigurationStore.Configuration.Server.menu_clients === 'true'">
+					<li class="nav-item" v-if="String(dashboardConfigurationStore.Configuration.Server.menu_clients) === 'true'">
 						<RouterLink class="nav-link rounded-3" to="/clients"
 						            active-class="active">
 							<i class="bi bi-people me-2"></i>
 							<LocaleText t="Clients"></LocaleText>
 						</RouterLink>
 					</li>
-					<li class="nav-item" v-if="dashboardConfigurationStore.Configuration.Server.menu_webhooks === 'true'">
+					<li class="nav-item" v-if="String(dashboardConfigurationStore.Configuration.Server.menu_webhooks) === 'true'">
 						<RouterLink class="nav-link rounded-3" to="/webhooks"
 									active-class="active">
 							<i class="bi bi-postcard me-2"></i>
 							<LocaleText t="Webhooks"></LocaleText>
 						</RouterLink>
 					</li>
-					<li class="nav-item" v-if="dashboardConfigurationStore.Configuration.Server.menu_help === 'true'">
+					<li class="nav-item" v-if="String(dashboardConfigurationStore.Configuration.Server.menu_help) === 'true'">
 						<a class="nav-link rounded-3" role="button" @click="openAgentModal = true">
 							<i class="bi bi-question-circle me-2"></i>
 							<LocaleText t="Help"></LocaleText>
@@ -128,23 +128,24 @@ export default {
 					<LocaleText t="Tools"></LocaleText>
 				</h6>
 				<ul class="nav flex-column px-2 gap-1">
-					<li class="nav-item">
+					<li class="nav-item" v-if="String(dashboardConfigurationStore.Configuration.Server.menu_system_status) === 'true'">
 						<RouterLink to="/system_status" class="nav-link rounded-3" active-class="active">
 							<LocaleText t="System Status"></LocaleText>
 						</RouterLink>
 					</li>
-					<li class="nav-item">
-						<RouterLink to="/ping" class="nav-link rounded-3" active-class="active">
-							<LocaleText t="Ping"></LocaleText>
-						</RouterLink></li>
-					<li class="nav-item">
-						<RouterLink to="/traceroute" class="nav-link rounded-3" active-class="active">
-							<LocaleText t="Traceroute"></LocaleText>
-						</RouterLink>
-					</li>
-					<li class="nav-item">
+					<li class="nav-item" v-if="String(dashboardConfigurationStore.Configuration.Server.menu_health_monitor) === 'true'">
 						<RouterLink to="/settings/health_monitor" class="nav-link rounded-3" active-class="active">
 							<LocaleText t="Peer Health Monitor"></LocaleText>
+						</RouterLink>
+					</li>
+                                        <li class="nav-item" v-if="String(dashboardConfigurationStore.Configuration.Server.menu_traceroute) === 'true'">
+                                                <RouterLink to="/traceroute" class="nav-link rounded-3" active-class="active">
+                                                        <LocaleText t="Traceroute"></LocaleText>
+                                                </RouterLink>
+                                        </li>
+					<li class="nav-item" v-if="String(dashboardConfigurationStore.Configuration.Server.menu_ping) === 'true'">
+						<RouterLink to="/ping" class="nav-link rounded-3" active-class="active">
+							<LocaleText t="Ping"></LocaleText>
 						</RouterLink>
 					</li>
 				</ul>

@@ -19,7 +19,7 @@ class DashboardConfig:
     DashboardVersion = 'v4.3.2'
     ConfigurationPath = os.getenv('CONFIGURATION_PATH', '.')
     ConfigurationFilePath = os.path.join(ConfigurationPath, 'wg-dashboard.ini')
-    
+
     def __init__(self):
         if not os.path.exists(DashboardConfig.ConfigurationFilePath):
             open(DashboardConfig.ConfigurationFilePath, "x")
@@ -50,7 +50,11 @@ class DashboardConfig:
                 "dashboard_language": "en-US",
                 "menu_clients": "true",
                 "menu_webhooks": "true",
-                "menu_help": "true"
+                "menu_help": "true",
+                "menu_system_status": "true",
+                "menu_ping": "true",
+                "menu_traceroute": "true",
+                "menu_health_monitor": "true"
             },
             "Peers": {
                 "peer_global_DNS": "1.1.1.1",
