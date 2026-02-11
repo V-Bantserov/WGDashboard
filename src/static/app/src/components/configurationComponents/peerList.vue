@@ -103,6 +103,15 @@ const fetchPeerList = async () => {
 }
 await fetchPeerList()
 
+// Auto-open peer details if id in query
+if (route.query.id) {
+        const peer = configurationPeers.value.find(p => p.id === route.query.id)
+        if (peer) {
+                configurationModalSelectedPeer.value = peer
+                configurationModals.value.peerDetails.modalOpen = true
+        }
+}
+
 // Fetch Peer Interval =====================================
 const fetchPeerListInterval = ref(undefined)
 const setFetchPeerListInterval = () => {
@@ -247,12 +256,6 @@ const closePeerDetails = () => {
 watch(() => route.query.id, (newValue) => {
         if (newValue){
                 wireguardConfigurationStore.searchString = newValue
-                // Auto-open peer details modal
-                const peer = configurationPeers.value.find(p => p.id === newValue)
-                if (peer) {
-                        configurationModalSelectedPeer.value = peer
-                        configurationModals.value.peerDetails.modalOpen = true
-                }
         }else{
                 wireguardConfigurationStore.searchString = undefined
         }
