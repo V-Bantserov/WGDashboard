@@ -177,6 +177,7 @@
                 <th><LocaleText t="Last Ping"></LocaleText></th>
                 <th><LocaleText t="Endpoint"></LocaleText></th>
                 <th><LocaleText t="Actions"></LocaleText></th>
+		<th><LocaleText t="Notify"></LocaleText></th>
               </tr>
             </thead>
             <tbody>
@@ -247,9 +248,19 @@
                     <i class="bi bi-broadcast"></i>
                   </button>
                 </td>
+                <td class="text-center">
+                  <button
+                    class="btn btn-sm"
+                    :class="peer.notify ? 'btn-outline-success' : 'btn-outline-secondary'"
+                    @click="openNotifyConfig(pk, peer)"
+                    :title="peer.notify ? 'Notifications configured' : 'Configure notifications'"
+                  >
+                    <i class="bi" :class="peer.notify ? 'bi-bell-fill' : 'bi-bell'"></i>
+                  </button>
+                </td>
               </tr>
               <tr v-if="Object.keys(healthData.peers || {}).length === 0">
-                <td colspan="10" class="text-center text-muted py-4">
+                <td colspan="11" class="text-center text-muted py-4">
                   <LocaleText :t="healthData.running ? 'Waiting for first check cycle...' : 'No peer health data available. Start monitoring to collect data.'"></LocaleText>
                 </td>
               </tr>
@@ -274,6 +285,82 @@
       ({{ healthData.stats.last_cycle_duration_ms }} ms)
     </div>
   </div>
+<!-- Notification Config Modal -->
+  <div v-if="notifyModal" class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+      <div class="modal-content bg-dark">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-bell me-2"></i>
+            <LocaleText t="Notification Settings"></LocaleText>: {{ notifyPeerName }}
+          </h5>
+          <button type="button" class="btn-close btn-close-white" @click="notifyModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label"><LocaleText t="Email Addresses"></LocaleText></label>
+            <input
+              type="text"
+              class="form-control bg-secondary bg-opacity-25 text-white"
+              v-model="notifyEmails"
+              placeholder="admin@example.com, tech@example.com"
+            >
+            <small class="text-muted"><LocaleText t="Comma separated email addresses"></LocaleText></small>
+          </div>
+          <div class="mb-3 d-flex align-items-center gap-2">
+            <small class="text-muted text-nowrap"><LocaleText t="Events"></LocaleText>:</small>
+            <div class="d-flex flex-wrap gap-3">
+              <div v-for="evt in availableEvents" :key="evt.id" class="form-check form-check-inline mb-0">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  :id="'evt_' + evt.id"
+                  :checked="notifyEvents.includes(evt.id)"
+                  @change="toggleEventSelection(evt.id)"
+                >
+                <label class="form-check-label" :for="'evt_' + evt.id">
+                  <LocaleText :t="evt.label"></LocaleText>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="mb-3" v-if="availableWebhooks.length > 0">
+            <label class="form-label"><LocaleText t="Webhooks"></LocaleText></label>
+            <div v-for="wh in availableWebhooks" :key="wh.WebHookID" class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                :id="'wh_' + wh.WebHookID"
+                :checked="notifyWebhooks.includes(wh.WebHookID)"
+                @change="toggleWebhookSelection(wh.WebHookID)"
+              >
+              <label class="form-check-label" :for="'wh_' + wh.WebHookID">
+                {{ wh.PayloadURL }}
+                <span v-if="!wh.IsActive" class="badge bg-warning ms-1">disabled</span>
+              </label>
+            </div>
+          </div>
+          <div v-else class="text-muted small">
+            <LocaleText t="No webhooks configured. Add webhooks in Settings."></LocaleText>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline-danger btn-sm" @click="clearNotifyConfig" v-if="notifyEmails || notifyWebhooks.length > 0">
+            <i class="bi bi-bell-slash me-1"></i>
+            <LocaleText t="Clear All"></LocaleText>
+          </button>
+          <button class="btn btn-secondary" @click="notifyModal = false">
+            <LocaleText t="Cancel"></LocaleText>
+          </button>
+          <button class="btn btn-primary" @click="saveNotifyConfig">
+            <i class="bi bi-check-lg me-1"></i>
+            <LocaleText t="Save"></LocaleText>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </template>
 
 <script setup>
@@ -367,6 +454,73 @@ function pingPeer(publicKey) {
     fetchHealthStatus()
     loading.value = false
   })
+}
+
+// Notification config modal
+const notifyModal = ref(false)
+const notifyPeerKey = ref('')
+const notifyPeerName = ref('')
+const notifyEmails = ref('')
+const notifyWebhooks = ref([])
+const availableWebhooks = ref([])
+const notifyEvents = ref([])
+const availableEvents = [
+  { id: 'peer_went_online', label: 'Went Online' },
+  { id: 'peer_went_offline', label: 'Went Offline' },
+  { id: 'peer_endpoint_changed', label: 'Endpoint Changed' }
+]
+
+function openNotifyConfig(publicKey, peer) {
+  notifyPeerKey.value = publicKey
+  notifyPeerName.value = peer.name || publicKey.substring(0, 8) + '...'
+  notifyEmails.value = (peer.notify_emails || []).join(', ')
+  notifyWebhooks.value = [...(peer.notify_webhooks || [])]
+  notifyEvents.value = [...(peer.notify_events || ['peer_went_online', 'peer_went_offline', 'peer_endpoint_changed'])]
+  // Fetch available webhooks
+  fetchGet('/api/webHooks/getWebHooks', {}, (res) => {
+    availableWebhooks.value = res.data || []
+  })
+  notifyModal.value = true
+}
+
+function saveNotifyConfig() {
+  const emails = notifyEmails.value.split(',').map(e => e.trim()).filter(e => e.length > 0)
+  fetchPost(`/api/health/peer/${encodeURIComponent(notifyPeerKey.value)}/notify`, {
+    emails: emails,
+    webhooks: notifyWebhooks.value,
+    events: notifyEvents.value
+  }, () => {
+    fetchHealthStatus()
+    notifyModal.value = false
+  })
+}
+
+function clearNotifyConfig() {
+  fetchPost(`/api/health/peer/${encodeURIComponent(notifyPeerKey.value)}/notify`, {
+    emails: [],
+    webhooks: []
+  }, () => {
+    fetchHealthStatus()
+    notifyModal.value = false
+  })
+}
+
+function toggleWebhookSelection(webhookId) {
+  const idx = notifyWebhooks.value.indexOf(webhookId)
+  if (idx >= 0) {
+    notifyWebhooks.value.splice(idx, 1)
+  } else {
+    notifyWebhooks.value.push(webhookId)
+  }
+}
+
+function toggleEventSelection(eventId) {
+  const idx = notifyEvents.value.indexOf(eventId)
+  if (idx >= 0) {
+    notifyEvents.value.splice(idx, 1)
+  } else {
+    notifyEvents.value.push(eventId)
+  }
 }
 
 // Toggle interface monitoring

@@ -213,20 +213,20 @@ with app.app_context():
     DashboardPlugins: DashboardPlugins = DashboardPlugins(app, WireguardConfigurations)
     DashboardWebHooks: DashboardWebHooks = DashboardWebHooks(DashboardConfig)
     NewConfigurationTemplates: NewConfigurationTemplates = NewConfigurationTemplates()
-    
+
     # Initialize DashboardAdmins
     DashboardAdmins: DashboardAdmins = DashboardAdmins(
         DashboardConfig.engine, 
         DashboardConfig.GetConfig('Database', 'type')[1]
     )
-    
+
     # Migrate admin from config file to database (first-time only)
     if DashboardAdmins.getAdminCount() == 0:
         _, configUsername = DashboardConfig.GetConfig("Account", "username")
         _, configPassword = DashboardConfig.GetConfig("Account", "password")
         _, enableTotp = DashboardConfig.GetConfig("Account", "enable_totp")
         _, totpKey = DashboardConfig.GetConfig("Account", "totp_key")
-        
+
         success, msg = DashboardAdmins.migrateFromConfig(
             username=configUsername,
             passwordHash=configPassword,
@@ -237,10 +237,12 @@ with app.app_context():
             print(f"[WGDashboard] Admin migrated to database: {configUsername}")
         else:
             print(f"[WGDashboard] Admin migration warning: {msg}")
-    
+
     InitWireguardConfigurationsList(startup=True)
     DashboardClients: DashboardClients = DashboardClients(WireguardConfigurations)
     PeerHealthMonitorInstance: PeerHealthMonitor = PeerHealthMonitor(DashboardConfig, WireguardConfigurations, app.logger)
+    PeerHealthMonitorInstance.set_webhook_callback(lambda action, data, webhook_ids=None: DashboardWebHooks.RunWebHook(action, data, webhook_ids))
+    PeerHealthMonitorInstance.set_email_sender(EmailSender)
     app.register_blueprint(createClientBlueprint(WireguardConfigurations, DashboardConfig, DashboardClients))
 
 _, APP_PREFIX = DashboardConfig.GetConfig("Server", "app_prefix")
@@ -1408,7 +1410,7 @@ def API_Health_Status():
     """Get health monitoring status"""
     return ResponseObject(data=PeerHealthMonitorInstance.get_all_health())
 
-@app.get(f'{APP_PREFIX}/api/health/peer/<public_key>')
+@app.get(f'{APP_PREFIX}/api/health/peer/<path:public_key>')
 def API_Health_Peer(public_key: str):
     """Get health info for specific peer"""
     health = PeerHealthMonitorInstance.get_peer_health(public_key)
@@ -1416,12 +1418,37 @@ def API_Health_Peer(public_key: str):
         return ResponseObject(data=health)
     return ResponseObject(False, "Peer not found in health data", status_code=404)
 
-@app.post(f'{APP_PREFIX}/api/health/peer/<public_key>/ping')
+@app.post(f'{APP_PREFIX}/api/health/peer/<path:public_key>/ping')
 def API_Health_PingPeer(public_key: str):
     """Ping specific peer immediately"""
     result = PeerHealthMonitorInstance.ping_peer_now(public_key)
     if result:
         return ResponseObject(data=result)
+    return ResponseObject(False, "Peer not found", status_code=404)
+
+@app.post(f'{APP_PREFIX}/api/health/peer/<path:public_key>/notify')
+def API_Health_PeerNotify(public_key: str):
+    """Set notification config for a peer"""
+    data = request.get_json()
+    config = {
+        "emails": data.get('emails', []),
+        "webhooks": data.get('webhooks', []),
+        "events": data.get('events', ['peer_went_online', 'peer_went_offline', 'peer_endpoint_changed'])
+    }
+    if PeerHealthMonitorInstance.set_peer_notify(public_key, config):
+        return ResponseObject(True, "Notification config updated")
+    return ResponseObject(False, "Failed to update notification config")
+
+@app.get(f'{APP_PREFIX}/api/health/peer/<path:public_key>/notify')
+def API_Health_GetPeerNotify(public_key: str):
+    """Get notification config for a peer"""
+    health = PeerHealthMonitorInstance.get_peer_health(public_key)
+    if health:
+        return ResponseObject(data={
+            "emails": health.get("notify_emails", []),
+            "webhooks": health.get("notify_webhooks", []),
+            "events": health.get("notify_events", [])
+        })
     return ResponseObject(False, "Peer not found", status_code=404)
 
 @app.post(f'{APP_PREFIX}/api/health/cycle')

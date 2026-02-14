@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import LocaleText from "@/components/text/localeText.vue";
+import { fetchGet, fetchPost } from '@/utilities/fetch'
 import {ref} from "vue";
 
 import {
@@ -34,6 +35,57 @@ import PeerTraffics from "@/components/peerDetailsModalComponents/peerTraffics.v
 import PeerEndpoints from "@/components/peerDetailsModalComponents/peerEndpoints.vue";
 const props = defineProps(['selectedPeer'])
 const selectedDate = ref(undefined)
+const notifyEmails = ref('')
+const notifyWebhooks = ref([])
+const notifyEvents = ref([])
+const availableWebhooks = ref([])
+const notifyLoaded = ref(false)
+const availableEvents = [
+  { id: 'peer_went_online', label: 'Peer Went Online' },
+  { id: 'peer_went_offline', label: 'Peer Went Offline' },
+  { id: 'peer_endpoint_changed', label: 'Peer Endpoint Changed' }
+]
+
+function loadNotifyConfig() {
+  if (!props.selectedPeer?.id) return
+  notifyLoaded.value = false
+  fetchGet(`/api/health/peer/${encodeURIComponent(props.selectedPeer.id)}/notify`, {}, (res) => {
+    if (res.status) {
+      notifyEmails.value = (res.data.emails || []).join(', ')
+      notifyWebhooks.value = [...(res.data.webhooks || [])]
+      notifyEvents.value = [...(res.data.events || ['peer_went_online', 'peer_went_offline', 'peer_endpoint_changed'])]
+    }
+    notifyLoaded.value = true
+  })
+  fetchGet('/api/webHooks/getWebHooks', {}, (res) => {
+    availableWebhooks.value = res.data || []
+  })
+}
+
+function saveNotifyConfig() {
+  const emails = notifyEmails.value.split(',').map(e => e.trim()).filter(e => e.length > 0)
+  fetchPost(`/api/health/peer/${encodeURIComponent(props.selectedPeer.id)}/notify`, {
+    emails: emails,
+    webhooks: notifyWebhooks.value,
+    events: notifyEvents.value
+  }, () => {
+    notifyLoaded.value = true
+  })
+}
+
+function toggleWebhook(id) {
+  const idx = notifyWebhooks.value.indexOf(id)
+  if (idx >= 0) notifyWebhooks.value.splice(idx, 1)
+  else notifyWebhooks.value.push(id)
+}
+
+function toggleEvent(id) {
+  const idx = notifyEvents.value.indexOf(id)
+  if (idx >= 0) notifyEvents.value.splice(idx, 1)
+  else notifyEvents.value.push(id)
+}
+
+loadNotifyConfig()
 defineEmits(['close'])
 </script>
 
@@ -159,6 +211,46 @@ defineEmits(['close'])
 									</div>
 								</div>
 							</div>
+							<div class="col-12">
+                                                                <div class="card rounded-3 bg-transparent">
+                                                                        <div class="card-body">
+                                                                                <div class="d-flex align-items-center mb-3">
+                                                                                        <i class="bi bi-bell me-2"></i>
+                                                                                        <h6 class="mb-0"><LocaleText t="Notification Settings"></LocaleText></h6>
+                                                                                </div>
+                                                                                <div class="row g-3" v-if="notifyLoaded">
+                                                                                        <div class="col-12 col-md-6">
+                                                                                                <label class="form-label small text-muted"><LocaleText t="Email Addresses"></LocaleText></label>
+                                                                                                <input type="text" class="form-control form-control-sm bg-secondary bg-opacity-25 text-white"
+                                                                                                        v-model="notifyEmails" placeholder="admin@example.com, tech@example.com">
+                                                                                        </div>
+                                                                                        <div class="col-12 col-md-6">
+                                                                                                <label class="form-label small text-muted"><LocaleText t="Events"></LocaleText></label>
+                                                                                                <div v-for="evt in availableEvents" :key="evt.id" class="form-check form-check-inline">
+                                                                                                        <input class="form-check-input" type="checkbox" :id="'pd_evt_' + evt.id"
+                                                                                                                :checked="notifyEvents.includes(evt.id)" @change="toggleEvent(evt.id)">
+                                                                                                        <label class="form-check-label small" :for="'pd_evt_' + evt.id">
+                                                                                                                <LocaleText :t="evt.label"></LocaleText>
+                                                                                                        </label>
+                                                                                                </div>
+                                                                                        </div>
+                                                                                        <div class="col-12" v-if="availableWebhooks.length > 0">
+                                                                                                <label class="form-label small text-muted"><LocaleText t="Webhooks"></LocaleText></label>
+                                                                                                <div v-for="wh in availableWebhooks" :key="wh.WebHookID" class="form-check form-check-inline">
+                                                                                                        <input class="form-check-input" type="checkbox" :id="'pd_wh_' + wh.WebHookID"
+                                                                                                                :checked="notifyWebhooks.includes(wh.WebHookID)" @change="toggleWebhook(wh.WebHookID)">
+                                                                                                        <label class="form-check-label small" :for="'pd_wh_' + wh.WebHookID">{{ wh.PayloadURL }}</label>
+                                                                                                </div>
+                                                                                        </div>
+                                                                                        <div class="col-12 text-end">
+                                                                                                <button class="btn btn-sm btn-primary" @click="saveNotifyConfig">
+                                                                                                        <i class="bi bi-check-lg me-1"></i><LocaleText t="Save"></LocaleText>
+                                                                                                </button>
+                                                                                        </div>
+                                                                                </div>
+                                                                        </div>
+                                                                </div>
+                                                        </div>
 							<div class="col-12">
 								<PeerTraffics
 									:selectedDate="selectedDate"

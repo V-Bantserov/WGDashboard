@@ -1,5 +1,5 @@
 <script>
-import {fetchPost} from "@/utilities/fetch.js";
+import {fetchPost, fetchGet} from "@/utilities/fetch.js";
 import {DashboardConfigurationStore} from "@/stores/DashboardConfigurationStore.js";
 import LocaleText from "@/components/text/localeText.vue";
 
@@ -14,7 +14,17 @@ export default {
 			data: undefined,
 			dataChanged: false,
 			showKey: false,
-			saving: false
+                        saving: false,
+                        notifyEmails: '',
+                        notifyWebhooks: [],
+                        notifyEvents: ['peer_went_online', 'peer_went_offline', 'peer_endpoint_changed'],
+                        availableWebhooks: [],
+                        availableEvents: [
+                                { id: 'peer_went_online', label: 'Went Online' },
+                                { id: 'peer_went_offline', label: 'Went Offline' },
+                                { id: 'peer_endpoint_changed', label: 'Endpoint Changed' }
+                        ]
+
 		}
 	},
 	setup(){
@@ -57,10 +67,46 @@ export default {
 				}
 				this.$emit("refresh")
 			})
-		}
+		},
+                loadNotifyConfig(){
+                        if (!this.selectedPeer?.id) return
+                        fetchGet(`/api/health/peer/${encodeURIComponent(this.selectedPeer.id)}/notify`, {}, (res) => {
+                                if (res.status) {
+                                        this.notifyEmails = (res.data.emails || []).join(', ')
+                                        this.notifyWebhooks = [...(res.data.webhooks || [])]
+                                        this.notifyEvents = [...(res.data.events || ['peer_went_online', 'peer_went_offline', 'peer_endpoint_changed'])]
+                                }
+                        })
+                        fetchGet('/api/webHooks/getWebHooks', {}, (res) => {
+                                this.availableWebhooks = res.data || []
+                        })
+                },
+                saveNotifyConfig(){
+                        const emails = this.notifyEmails.split(',').map(e => e.trim()).filter(e => e.length > 0)
+                        fetchPost(`/api/health/peer/${encodeURIComponent(this.selectedPeer.id)}/notify`, {
+                                emails: emails,
+                                webhooks: this.notifyWebhooks,
+                                events: this.notifyEvents
+                        }, (res) => {
+                                if (res.status) {
+                                        this.dashboardConfigurationStore.newMessage("Server", "Notification settings saved", "success")
+                                }
+                        })
+                },
+                toggleNotifyEvent(id){
+                        const idx = this.notifyEvents.indexOf(id)
+                        if (idx >= 0) this.notifyEvents.splice(idx, 1)
+                        else this.notifyEvents.push(id)
+                },
+                toggleNotifyWebhook(id){
+                        const idx = this.notifyWebhooks.indexOf(id)
+                        if (idx >= 0) this.notifyWebhooks.splice(idx, 1)
+                        else this.notifyWebhooks.push(id)
+                },
 	},
 	beforeMount() {
 		this.reset();
+                this.loadNotifyConfig();
 	},
 	mounted() {
 		this.$el.querySelectorAll("input, textarea").forEach(x => {
@@ -218,6 +264,64 @@ export default {
 									</div>
 								</div>
 							</div>
+                                                        <div class="accordion my-3" id="notifySettingsAccordion">
+                                                                <div class="accordion-item">
+                                                                        <h2 class="accordion-header">
+                                                                                <button class="accordion-button rounded-3 collapsed" type="button"
+                                                                                        data-bs-toggle="collapse" data-bs-target="#notifySettingsAccordionBody">
+                                                                                        <i class="bi bi-bell me-2"></i>
+                                                                                        <LocaleText t="Notification Settings"></LocaleText>
+                                                                                </button>
+                                                                        </h2>
+                                                                        <div id="notifySettingsAccordionBody" class="accordion-collapse collapse"
+                                                                             data-bs-parent="#notifySettingsAccordion">
+                                                                                <div class="accordion-body d-flex flex-column gap-2 mb-2">
+                                                                                        <div>
+                                                                                                <label class="form-label">
+                                                                                                        <small class="text-muted"><LocaleText t="Email Addresses"></LocaleText></small>
+                                                                                                </label>
+                                                                                                <input type="text" class="form-control form-control-sm rounded-3"
+                                                                                                       v-model="this.notifyEmails"
+                                                                                                       placeholder="admin@example.com, tech@example.com">
+                                                                                        </div>
+											<div class="d-flex align-items-center gap-2 mt-2">
+                                                                                                <small class="text-muted text-nowrap"><LocaleText t="Events"></LocaleText>:</small>
+                                                                                                <div class="d-flex flex-wrap gap-3">
+                                                                                                        <div v-for="evt in availableEvents" :key="evt.id" class="form-check form-check-inline mb-0">
+                                                                                                                <input class="form-check-input" type="checkbox"
+                                                                                                                       :id="'ps_evt_' + evt.id"
+                                                                                                                       :checked="notifyEvents.includes(evt.id)"
+                                                                                                                       @change="toggleNotifyEvent(evt.id)">
+                                                                                                                <label class="form-check-label" :for="'ps_evt_' + evt.id">
+                                                                                                                        <small><LocaleText :t="evt.label"></LocaleText></small>
+                                                                                                                </label>
+                                                                                                        </div>
+                                                                                                </div>
+                                                                                        </div>
+                                                                                        <div v-if="availableWebhooks.length > 0">
+                                                                                                <label class="form-label">
+                                                                                                        <small class="text-muted"><LocaleText t="Webhooks"></LocaleText></small>
+                                                                                                </label>
+                                                                                                <div v-for="wh in availableWebhooks" :key="wh.WebHookID" class="form-check">
+                                                                                                        <input class="form-check-input" type="checkbox"
+                                                                                                               :id="'ps_wh_' + wh.WebHookID"
+                                                                                                               :checked="notifyWebhooks.includes(wh.WebHookID)"
+                                                                                                               @change="toggleNotifyWebhook(wh.WebHookID)">
+                                                                                                        <label class="form-check-label" :for="'ps_wh_' + wh.WebHookID">
+                                                                                                                <small>{{ wh.PayloadURL }}</small>
+                                                                                                        </label>
+                                                                                                </div>
+                                                                                        </div>
+                                                                                        <div class="text-end">
+                                                                                                <button class="btn btn-sm btn-primary rounded-3" @click="saveNotifyConfig">
+                                                                                                        <i class="bi bi-check-lg me-1"></i>
+                                                                                                        <LocaleText t="Save"></LocaleText>
+                                                                                                </button>
+                                                                                        </div>
+                                                                                </div>
+                                                                        </div>
+                                                                </div>
+                                                        </div>
 							<div class="d-flex align-items-center gap-2">
 								<button class="btn bg-secondary-subtle border-secondary-subtle text-secondary-emphasis rounded-3 shadow ms-auto px-3 py-2"
 								        @click="this.reset()"

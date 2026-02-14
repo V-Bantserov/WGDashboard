@@ -487,5 +487,10 @@
         "Delete Admin": "",
         "Confirm Password": "",
         "Confirm New Password": "",
-        "Save Changes": ""
+        "Save Changes": "",
+	"Peer Went Online": "",
+        "Peer Went Offline": "",
+        "Peer Unreachable": "",
+        "Peer Endpoint Changed": "",
+        "Notify": ""
 }

@@ -27,9 +27,12 @@ if (!props.webHook){
 }
 
 const Actions = ref({
-	'peer_created': GetLocale("Peer Created"),
-	'peer_deleted': GetLocale("Peer Deleted"),
-	'peer_updated': GetLocale("Peer Updated")
+        'peer_created': GetLocale("Peer Created"),
+        'peer_deleted': GetLocale("Peer Deleted"),
+        'peer_updated': GetLocale("Peer Updated"),
+        'peer_went_online': GetLocale("Went Online"),
+        'peer_went_offline': GetLocale("Went Offline"),
+        'peer_endpoint_changed': GetLocale("Endpoint Changed")
 })
 const emits = defineEmits(['refresh', 'delete'])
 import { DashboardConfigurationStore } from "@/stores/DashboardConfigurationStore"

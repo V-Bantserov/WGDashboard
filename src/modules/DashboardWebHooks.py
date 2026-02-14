@@ -11,7 +11,8 @@ import sqlalchemy as db
 from .ConnectionString import ConnectionString
 from flask import current_app
 
-WebHookActions = ['peer_created', 'peer_deleted', 'peer_updated']
+WebHookActions = ['peer_created', 'peer_deleted', 'peer_updated', 'peer_went_online', 'peer_went_offline', 'peer_endpoint_changed']
+
 class WebHook(BaseModel):
     WebHookID: str = ''
     PayloadURL: str = ''
@@ -27,14 +28,14 @@ class WebHookSessionLog(BaseModel):
     LogTime: datetime
     Status: int
     Message: str = ''
-    
+
     @field_serializer('LogTime')
     def logTimeSerializer(self, LogTime: datetime):
         return LogTime.strftime("%Y-%m-%d %H:%M:%S")
 
 class WebHookSessionLogs(BaseModel):
     Logs: list[WebHookSessionLog] = []
-    
+
     def addLog(self, status: int, message: str):
         self.Logs.append(WebHookSessionLog(LogTime=datetime.now(), Status=status, Message=message))
 
@@ -143,8 +144,8 @@ class DashboardWebHooks:
                 'application/json', 'application/x-www-form-urlencoded'
             ]:
                 return False, "Content Type is invalid"
-            
-            
+
+
             with self.engine.begin() as conn:
                 if self.SearchWebHook(webHook):
                     conn.execute(
@@ -165,7 +166,7 @@ class DashboardWebHooks:
         except Exception as e:
             return False, str(e)
         return True, None
-    
+
     def DeleteWebHook(self, webHook) -> tuple[bool, str] | tuple[bool, None]:
         try:
             webHook = WebHook(**webHook)
@@ -179,14 +180,19 @@ class DashboardWebHooks:
         except Exception as e:
             return False, str(e)
         return True, None
-    
-    def RunWebHook(self, action: str, data):
+
+    def RunWebHook(self, action: str, data, webhook_ids: list = None):
         try:
             if action not in WebHookActions:
                 return False
             self.__getWebHooks()
             subscribedWebHooks = filter(lambda webhook: action in webhook.SubscribedActions and webhook.IsActive, 
                                         self.WebHooks)
+
+            # Filter by specific webhook IDs if provided
+            if webhook_ids:
+                subscribedWebHooks = filter(lambda webhook: webhook.WebHookID in webhook_ids,
+                                            subscribedWebHooks)
             data['action'] = action
             for i in subscribedWebHooks:
                 try:

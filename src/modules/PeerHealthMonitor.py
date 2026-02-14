@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from icmplib import ping as icmp_ping
 import logging
-
+import os
 
 class PeerStatus(Enum):
     """Peer status based on handshake time and ping result"""
@@ -67,6 +67,12 @@ class PeerHealthInfo:
     last_endpoint: str = ""
     endpoint_changed: bool = False
 
+    # Notification settings
+    notify: bool = False
+    notify_emails: list = None
+    notify_webhooks: list = None
+    notify_events: list = None
+
     def to_dict(self) -> dict:
         return {
             "public_key": self.public_key,
@@ -81,7 +87,11 @@ class PeerHealthInfo:
             "status": self.status.value,
             "last_handshake": self.last_handshake.isoformat() if self.last_handshake else None,
             "last_endpoint": self.last_endpoint,
-            "endpoint_changed": self.endpoint_changed
+            "endpoint_changed": self.endpoint_changed,
+            "notify": self.notify,
+            "notify_emails": self.notify_emails or [],
+            "notify_webhooks": self.notify_webhooks or [],
+            "notify_events": self.notify_events or [],
         }
 
     def _ping_success_rate(self) -> float:
@@ -110,7 +120,7 @@ class PeerHealthMonitor:
     - Collection of availability statistics
     - Detection of endpoint changes
     - Per-interface configuration with persistence
-    
+
     Status determination:
     - First check handshake age (from WireGuard)
     - Then ping only if peer might be reachable (handshake < 15 min)
@@ -146,6 +156,15 @@ class PeerHealthMonitor:
             "last_cycle_duration_ms": 0
         }
 
+        # Webhook callback (set from dashboard.py)
+        self._webhook_callback = None
+
+        # Per-peer notification config {public_key: {"emails": [...], "webhooks": [...]}}
+        self._notify_config: dict = {}
+
+        # Email sender (set from dashboard.py)
+        self._email_sender = None
+
         # Load saved configuration from INI file
         self._load_config_from_ini()
 
@@ -158,7 +177,7 @@ class PeerHealthMonitor:
                 if section.startswith("Health:"):
                     interface_name = section[7:]  # Remove "Health:" prefix
                     cfg = InterfaceHealthConfig()
-                    
+
                     if config.has_option(section, "enabled"):
                         cfg.enabled = config.get(section, "enabled").lower() == "true"
                     if config.has_option(section, "ping_interval"):
@@ -167,9 +186,10 @@ class PeerHealthMonitor:
                         cfg.set_keepalive = config.get(section, "set_keepalive").lower() == "true"
                     if config.has_option(section, "keepalive_value"):
                         cfg.keepalive_value = max(10, min(120, int(config.get(section, "keepalive_value"))))
-                    
+
                     self._interface_config[interface_name] = cfg
                     self.logger.info(f"Loaded health config for {interface_name}: enabled={cfg.enabled}, interval={cfg.ping_interval}")
+                self._load_notify_config()
         except Exception as e:
             self.logger.error(f"Error loading health config from INI: {e}")
 
@@ -178,26 +198,126 @@ class PeerHealthMonitor:
         try:
             if interface not in self._interface_config:
                 return False
-            
+
             cfg = self._interface_config[interface]
             section = f"Health:{interface}"
-            
+
             # Ensure section exists
             config = self.dashboard_config._DashboardConfig__config
             if not config.has_section(section):
                 config.add_section(section)
-            
+
             # Set values
             config.set(section, "enabled", "true" if cfg.enabled else "false")
             config.set(section, "ping_interval", str(cfg.ping_interval))
             config.set(section, "set_keepalive", "true" if cfg.set_keepalive else "false")
             config.set(section, "keepalive_value", str(cfg.keepalive_value))
-            
+
             # Save to file
             return self.dashboard_config.SaveConfig()
         except Exception as e:
             self.logger.error(f"Error saving health config for {interface}: {e}")
             return False
+
+    def set_webhook_callback(self, callback):
+        """Set callback function for webhook notifications"""
+        self._webhook_callback = callback
+
+    def set_peer_notify(self, public_key: str, config: dict) -> bool:
+        """Set notification config for a peer"""
+        emails = config.get('emails', [])
+        webhooks = config.get('webhooks', [])
+        events = config.get('events', [])
+        has_any = len(emails) > 0 or len(webhooks) > 0
+
+        with self._health_lock:
+            if has_any:
+                self._notify_config[public_key] = {
+                    "emails": emails,
+                    "webhooks": webhooks,
+                    "events": events
+                }
+            else:
+                self._notify_config.pop(public_key, None)
+
+            if public_key in self._peer_health:
+                self._peer_health[public_key].notify = has_any
+                self._peer_health[public_key].notify_emails = emails
+                self._peer_health[public_key].notify_webhooks = webhooks
+                self._peer_health[public_key].notify_events = events
+
+        self._save_notify_config()
+        return True
+
+    def set_email_sender(self, email_sender):
+        """Set email sender instance"""
+        self._email_sender = email_sender
+
+    def _save_notify_config(self):
+        """Save notify config to JSON file"""
+        try:
+            import json
+            config_path = os.path.join(os.path.dirname(__file__), '..', 'notification_config.json')
+            with open(config_path, 'w') as f:
+                json.dump(self._notify_config, f, indent=2)
+        except Exception as e:
+            self.logger.error(f"Error saving notify config: {e}")
+
+    def _load_notify_config(self):
+        """Load notify config from JSON file"""
+        try:
+            import json
+            config_path = os.path.join(os.path.dirname(__file__), '..', 'notification_config.json')
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    self._notify_config = json.load(f)
+                self.logger.info(f"Loaded notification config for {len(self._notify_config)} peers")
+        except Exception as e:
+            self.logger.error(f"Error loading notify config: {e}")
+
+    def _fire_webhook(self, action: str, peer_health: PeerHealthInfo):
+        """Fire notifications for peer status change"""
+        pk = peer_health.public_key
+        self.logger.info(f"FIRE WEBHOOK: action={action} peer={peer_health.name} email_sender={self._email_sender is not None}")
+        config = self._notify_config.get(pk, {})
+        if not config:
+            return
+
+        data = {
+            "peer_name": peer_health.name or pk[:8],
+            "public_key": pk,
+            "interface": peer_health.interface,
+            "vpn_ip": peer_health.vpn_ip,
+            "status": peer_health.status.value,
+            "endpoint": peer_health.last_endpoint,
+        }
+
+        # Fire selected webhooks only
+        webhook_ids = config.get("webhooks", [])
+        if webhook_ids and self._webhook_callback:
+            try:
+                self._webhook_callback(action, data, webhook_ids)
+            except Exception as e:
+                self.logger.error(f"Error firing webhooks: {e}")
+
+        # Send emails
+        emails = config.get("emails", [])
+        if emails and self._email_sender:
+            try:
+                subject = f"[WGDashboard] {action.replace('_', ' ').title()}: {data['peer_name']}"
+                body = (
+                    f"Event: {action.replace('_', ' ').title()}\n"
+                    f"Peer: {data['peer_name']}\n"
+                    f"Interface: {data['interface']}\n"
+                    f"VPN IP: {data['vpn_ip']}\n"
+                    f"Status: {data['status']}\n"
+                    f"Endpoint: {data['endpoint']}\n"
+                )
+                for email in emails:
+                    self._email_sender.send(email, subject, body)
+                self.logger.info(f"Emails sent for {action}: {data['peer_name']} to {', '.join(emails)}")
+            except Exception as e:
+                self.logger.error(f"Error sending notification emails: {e}")
 
     def start(self) -> bool:
         """Start health monitoring thread"""
@@ -425,10 +545,21 @@ class PeerHealthMonitor:
         health.vpn_ip = vpn_ip
         health.interface = interface
         health.name = name
+        peer_cfg = self._notify_config.get(public_key, {})
+        health.notify = bool(peer_cfg)
+        health.notify_emails = peer_cfg.get("emails", [])
+        health.notify_webhooks = peer_cfg.get("webhooks", [])
+        health.notify_events = peer_cfg.get("events", [])
 
-        # Check for endpoint change
+        # Save previous status for change detection
+        previous_status = health.status
+
+        # Check for REAL endpoint change (ignore "(none)" transitions)
         current_endpoint = peer_info.get("endpoint", "")
-        if health.last_endpoint and health.last_endpoint != current_endpoint and current_endpoint != "(none)":
+        if (health.last_endpoint
+                and health.last_endpoint != "(none)"
+                and current_endpoint != "(none)"
+                and health.last_endpoint != current_endpoint):
             health.endpoint_changed = True
             results["endpoint_changes"] += 1
             self._stats["endpoint_updates"] += 1
@@ -449,6 +580,7 @@ class PeerHealthMonitor:
             health.status = PeerStatus.UNKNOWN
             results["skipped"] += 1
             self._stats["skipped_offline"] += 1
+            self._notify_status_change(health, previous_status)
             return
 
         if handshake_age > HANDSHAKE_RECENT_TIMEOUT:
@@ -458,7 +590,14 @@ class PeerHealthMonitor:
             results["offline"] += 1
             results["skipped"] += 1
             self._stats["skipped_offline"] += 1
+            self._notify_status_change(health, previous_status)
             return
+
+        # Reset stats on reconnect (from offline/unknown to active)
+        if previous_status in (PeerStatus.OFFLINE, PeerStatus.UNKNOWN):
+            health.ping_success_count = 0
+            health.ping_fail_count = 0
+            health.ping_rtt_ms = 0.0
 
         # STEP 3: Peer has recent handshake - ping to trigger endpoint update
         ping_result = self._do_ping(vpn_ip)
@@ -485,9 +624,44 @@ class PeerHealthMonitor:
                 health.is_pingable = True
                 results["pingable"] += 1
 
+        self._notify_status_change(health, previous_status)
+
+    def _notify_status_change(self, health: PeerHealthInfo, previous_status):
+        """Fire notifications on significant peer status changes only"""
+        if not health.notify:
+            return
+        self.logger.info(f"NOTIFY CHECK: {health.name} prev={previous_status} new={health.status} notify={health.notify}")
+        peer_cfg = self._notify_config.get(health.public_key, {})
+        subscribed_events = peer_cfg.get("events", ['peer_went_online', 'peer_went_offline', 'peer_endpoint_changed'])
+
+        # Endpoint changed while peer is active (regardless of status change)
+        if health.endpoint_changed and 'peer_endpoint_changed' in subscribed_events:
+            if (health.status in (PeerStatus.ONLINE, PeerStatus.UNPINGABLE)
+                    and previous_status in (PeerStatus.ONLINE, PeerStatus.UNPINGABLE)):
+                self._fire_webhook('peer_endpoint_changed', health)
+
+        if previous_status == health.status:
+            return
+
+        # Peer disconnecting: active -> RECENT (first sign of disconnect)
+        if health.status == PeerStatus.RECENT and previous_status in (PeerStatus.ONLINE, PeerStatus.UNPINGABLE):
+            if 'peer_went_offline' in subscribed_events:
+                self._fire_webhook('peer_went_offline', health)
+            return
+
+        # Peer went fully offline: RECENT -> OFFLINE
+        if health.status == PeerStatus.OFFLINE and previous_status == PeerStatus.RECENT:
+            return
+
+        # Peer reconnected: inactive -> any active state (ONLINE or UNPINGABLE)
+        if health.status in (PeerStatus.ONLINE, PeerStatus.UNPINGABLE) and previous_status in (PeerStatus.OFFLINE, PeerStatus.UNKNOWN, PeerStatus.RECENT):
+            if 'peer_went_online' in subscribed_events:
+                self._fire_webhook('peer_went_online', health)
+            return
+
     def _parse_handshake_age(self, health: PeerHealthInfo, latest_handshake) -> Optional[timedelta]:
         """Parse handshake time and return age. Returns None if no valid handshake.
-        
+
         Handles formats:
         - "0:00:54" (H:MM:SS)
         - "1 day, 20:38:48" (X day(s), H:MM:SS)
@@ -497,47 +671,47 @@ class PeerHealthMonitor:
         """
         if not latest_handshake:
             return None
-        
+
         # Handle string formats
         if isinstance(latest_handshake, str):
             # Skip invalid values
             if latest_handshake in ("No Handshake", "N/A", "", "0"):
                 return None
-            
+
             try:
                 # Try to parse timedelta string format from WGDashboard
                 # Format: "H:MM:SS" or "X day(s), H:MM:SS"
                 days = 0
                 time_part = latest_handshake
-                
+
                 if "day" in latest_handshake:
                     # "1 day, 20:38:48" or "2 days, 1:23:45"
                     parts = latest_handshake.split(", ")
                     day_part = parts[0]
                     days = int(day_part.split()[0])
                     time_part = parts[1] if len(parts) > 1 else "0:0:0"
-                
+
                 # Parse time part "H:MM:SS" or "HH:MM:SS"
                 time_parts = time_part.split(":")
                 if len(time_parts) == 3:
                     hours = int(time_parts[0])
                     minutes = int(time_parts[1])
                     seconds = int(time_parts[2])
-                    
+
                     age = timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
                     health.last_handshake = datetime.now() - age
                     return age
-                    
+
             except (ValueError, IndexError) as e:
                 self.logger.debug(f"Could not parse timedelta string '{latest_handshake}': {e}")
-            
+
             # Try ISO format
             try:
                 health.last_handshake = datetime.fromisoformat(latest_handshake)
                 return datetime.now() - health.last_handshake
             except ValueError:
                 pass
-            
+
             # Try as Unix timestamp string
             try:
                 ts = float(latest_handshake)
@@ -546,13 +720,13 @@ class PeerHealthMonitor:
                     return datetime.now() - health.last_handshake
             except ValueError:
                 pass
-                
+
         # Handle numeric timestamps
         elif isinstance(latest_handshake, (int, float)):
             if latest_handshake > 0:
                 health.last_handshake = datetime.fromtimestamp(latest_handshake)
                 return datetime.now() - health.last_handshake
-                
+
         # Handle datetime objects
         elif isinstance(latest_handshake, datetime):
             health.last_handshake = latest_handshake
